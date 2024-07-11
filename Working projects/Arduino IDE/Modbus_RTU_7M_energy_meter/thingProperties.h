@@ -8,7 +8,8 @@ const char PASS[] = WIFI_SECRET_PASSWORD;
 float energy;
 float iFreq;
 float iPower;
-float iVoltage;
+float iVoltage; 
+float iCurrent;
 
 void initProperties()
 {
@@ -16,6 +17,8 @@ void initProperties()
   ArduinoCloud.addProperty(iFreq, READ, ON_CHANGE, NULL);
   ArduinoCloud.addProperty(iPower, READ, ON_CHANGE, NULL);
   ArduinoCloud.addProperty(iVoltage, READ, ON_CHANGE, NULL);
+    ArduinoCloud.addProperty(iCurrent, READ, ON_CHANGE, NULL);
+
 }
 
 #if ARDUINO_CLOUD_USE_WIFI == 1

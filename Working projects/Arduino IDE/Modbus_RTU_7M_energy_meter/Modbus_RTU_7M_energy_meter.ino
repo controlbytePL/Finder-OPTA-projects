@@ -11,10 +11,16 @@ const uint8_t MODBUS_7M_ADDRESS = 33;
 float power;
 float voltage;
 float freq;
+float current;
 
 void setup()
 {
     Serial.begin(9600);
+
+    digitalWrite(D0, HIGH);
+    digitalWrite(D1, HIGH);
+    digitalWrite(D2, HIGH);
+    digitalWrite(D3, LOW);
 
     digitalWrite(LEDG, HIGH);
     digitalWrite(LEDB, HIGH);
@@ -104,6 +110,16 @@ void loop()
         power = convert_t6(data);
         iPower = (float)power;
     }
+
+    data = modbus_7m_read32(MODBUS_7M_ADDRESS, FINDER_7M_REG_I1);
+    Serial.println("   current I1 = " + (data != INVALID_DATA ? String(convert_t5(data)) : String("read error")));
+
+    if (data != INVALID_DATA)
+    {
+        current = convert_t5(data);
+        iCurrent = (float)current;
+    }
+
     for (uint32_t i = 0; i < READ_INTERVAL_SECONDS * 10; i++)
     {
         ArduinoCloud.update();
@@ -204,4 +220,3 @@ void iotDisconnect()
 {
     digitalWrite(LEDB, LOW);
 }
-

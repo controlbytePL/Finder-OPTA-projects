@@ -5,6 +5,7 @@
 #define FINDER_7M_REG_U1 107                   // Voltage U1
 #define FINDER_7M_REG_U2 109                   // Voltage U2
 #define FINDER_7M_REG_U3 111                   // Voltage U3
+#define FINDER_7M_REG_I1 126                   // Current I1
 #define FINDER_7M_REG_ACTIVE_POWER_TOTAL 140   // Active Power Total (Pt)
 #define FINDER_7M_REG_ENERGY_COUNTER_E1 406    // Energy counter E1
 #define FINDER_7M_REG_ENERGY_COUNTER_E2 408    // Energy counter E2

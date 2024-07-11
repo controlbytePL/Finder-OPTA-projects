@@ -1,5 +1,3 @@
-#define WIFI_SECRET_SSID "nazwa sieci"
-#define WIFI_SECRET_PASSWORD "haslo"
 
 #define READ_INTERVAL_SECONDS 10
 
