@@ -1,3 +1,5 @@
+#define WIFI_SECRET_SSID "Controlbyte"
+#define WIFI_SECRET_PASSWORD "controlbyte2023"
 
 #define READ_INTERVAL_SECONDS 10
 
