@@ -7,11 +7,29 @@ constexpr auto preDelayBR { bitduration * 9.6f * 3.5f * 1e6 };
 constexpr auto postDelayBR { bitduration * 9.6f * 3.5f * 1e6 };
 
 struct DataStructure {
-  int parameter1;
-  int parameter2;
-  int parameter3;
-  int parameter4;
-  int parameter5;
+  int jobID;
+  char partname[20];
+  float deformdiameter;
+  float correctionvalue;
+  float deformpressure;
+  float dieset;
+  float maxdiameter;
+  float mindiameter;
+  float maxpressure;
+  float minpressure;
+  float opendiameter;
+  float pressureswitch;
+  float diameterswitch;
+  float holdingtime;
+  bool diameterunit;
+  bool pressureunit;
+  bool deformtopressure;
+  char nextpartname[20];
+  int batchsize;
+  int batchcount;
+  float diameter;
+  float pressure;
+  char now[20];
 };
 
 DataStructure data;
@@ -38,7 +56,7 @@ void setup() {
   }
 
   // Configure holding registers at address 0x00
-  ModbusRTUServer.configureHoldingRegisters(0x00, 10);
+  ModbusRTUServer.configureHoldingRegisters(0x00, 60); // Ensure enough registers are allocated
 
   pinMode(A0, INPUT_PULLUP); // Button STOP (NC)
   pinMode(A1, INPUT); // Button START
@@ -52,9 +70,9 @@ void setup() {
 void loop() {
   // Read potentiometer value and map to interval
   int potValue = analogRead(A2);
-  readInterval = map(potValue, 0, 100, 100, 2000);
+  readInterval = map(potValue, 0, 1023, 100, 2000);
 
-  // Obsługa przycisku START
+  // Handle START button
   if (digitalRead(A1) == HIGH && millis() - lastButtonPress > 300) { // Debounce delay
     loopData = true;
     digitalWrite(D0, HIGH); // Set D0 high (active)
@@ -62,7 +80,7 @@ void loop() {
     lastButtonPress = millis();
   }
 
-  // Obsługa przycisku STOP (NC)
+  // Handle STOP button (NC)
   if (digitalRead(A0) == LOW && millis() - lastButtonPress > 300) { // Debounce delay
     loopData = false;
     digitalWrite(D0, LOW); // Set D0 low (inactive)
@@ -87,27 +105,81 @@ void loop() {
 
 void receiveData() {
   bool success = true;
-  data.parameter1 = ModbusRTUServer.holdingRegisterRead(0);
-  data.parameter2 = ModbusRTUServer.holdingRegisterRead(1);
-  data.parameter3 = ModbusRTUServer.holdingRegisterRead(2);
-  data.parameter4 = ModbusRTUServer.holdingRegisterRead(3);
-  data.parameter5 = ModbusRTUServer.holdingRegisterRead(4);
+  data.jobID = ModbusRTUServer.holdingRegisterRead(0);
+  success &= readStringFromModbus(1, 1, data.partname, 10);
+  data.deformdiameter = modbusToFloat(ModbusRTUServer.holdingRegisterRead(11), ModbusRTUServer.holdingRegisterRead(12));
+  data.correctionvalue = modbusToFloat(ModbusRTUServer.holdingRegisterRead(13), ModbusRTUServer.holdingRegisterRead(14));
+  data.deformpressure = modbusToFloat(ModbusRTUServer.holdingRegisterRead(15), ModbusRTUServer.holdingRegisterRead(16));
+  data.dieset = modbusToFloat(ModbusRTUServer.holdingRegisterRead(17), ModbusRTUServer.holdingRegisterRead(18));
+  data.maxdiameter = modbusToFloat(ModbusRTUServer.holdingRegisterRead(19), ModbusRTUServer.holdingRegisterRead(20));
+  data.mindiameter = modbusToFloat(ModbusRTUServer.holdingRegisterRead(21), ModbusRTUServer.holdingRegisterRead(22));
+  data.maxpressure = modbusToFloat(ModbusRTUServer.holdingRegisterRead(23), ModbusRTUServer.holdingRegisterRead(24));
+  data.minpressure = modbusToFloat(ModbusRTUServer.holdingRegisterRead(25), ModbusRTUServer.holdingRegisterRead(26));
+  data.opendiameter = modbusToFloat(ModbusRTUServer.holdingRegisterRead(27), ModbusRTUServer.holdingRegisterRead(28));
+  data.pressureswitch = modbusToFloat(ModbusRTUServer.holdingRegisterRead(29), ModbusRTUServer.holdingRegisterRead(30));
+  data.diameterswitch = modbusToFloat(ModbusRTUServer.holdingRegisterRead(31), ModbusRTUServer.holdingRegisterRead(32));
+  data.holdingtime = modbusToFloat(ModbusRTUServer.holdingRegisterRead(33), ModbusRTUServer.holdingRegisterRead(34));
+  data.diameterunit = ModbusRTUServer.holdingRegisterRead(35);
+  data.pressureunit = ModbusRTUServer.holdingRegisterRead(36);
+  data.deformtopressure = ModbusRTUServer.holdingRegisterRead(37);
+  success &= readStringFromModbus(1, 38, data.nextpartname, 10);
+  data.batchsize = ModbusRTUServer.holdingRegisterRead(48);
+  data.batchcount = ModbusRTUServer.holdingRegisterRead(49);
+  data.diameter = modbusToFloat(ModbusRTUServer.holdingRegisterRead(50), ModbusRTUServer.holdingRegisterRead(51));
+  data.pressure = modbusToFloat(ModbusRTUServer.holdingRegisterRead(52), ModbusRTUServer.holdingRegisterRead(53));
+  success &= readStringFromModbus(1, 54, data.now, 10);
 
   if (success) {
-    digitalWrite(LED_RESET, HIGH); // Sygnalizacja sukcesu połączenia Modbus
-    digitalWrite(LEDR, LOW); // Wyłączenie sygnalizacji błędu
+    digitalWrite(LED_RESET, HIGH); // Indicate successful Modbus connection
+    digitalWrite(LEDR, LOW); // Turn off error indicator
   } else {
-    digitalWrite(LED_RESET, LOW); // Wyłączenie sygnalizacji sukcesu
-    digitalWrite(LEDR, HIGH); // Sygnalizacja błędu połączenia Modbus
+    digitalWrite(LED_RESET, LOW); // Turn off success indicator
+    digitalWrite(LEDR, HIGH); // Indicate Modbus connection error
   }
 
   printData();
 }
 
 void printData() {
-  Serial.print("Param1: "); Serial.println(data.parameter1);
-  Serial.print("Param2: "); Serial.println(data.parameter2);
-  Serial.print("Param3: "); Serial.println(data.parameter3);
-  Serial.print("Param4: "); Serial.println(data.parameter4);
-  Serial.print("Param5: "); Serial.println(data.parameter5);
+  Serial.print("JobID: "); Serial.println(data.jobID);
+  Serial.print("Part Name: "); Serial.println(data.partname);
+  Serial.print("Deform Diameter: "); Serial.println(data.deformdiameter);
+  Serial.print("Correction Value: "); Serial.println(data.correctionvalue);
+  Serial.print("Deform Pressure: "); Serial.println(data.deformpressure);
+  Serial.print("Dieset: "); Serial.println(data.dieset);
+  Serial.print("Max Diameter: "); Serial.println(data.maxdiameter);
+  Serial.print("Min Diameter: "); Serial.println(data.mindiameter);
+  Serial.print("Max Pressure: "); Serial.println(data.maxpressure);
+  Serial.print("Min Pressure: "); Serial.println(data.minpressure);
+  Serial.print("Open Diameter: "); Serial.println(data.opendiameter);
+  Serial.print("Pressure Switch: "); Serial.println(data.pressureswitch);
+  Serial.print("Diameter Switch: "); Serial.println(data.diameterswitch);
+  Serial.print("Holding Time: "); Serial.println(data.holdingtime);
+  Serial.print("Diameter Unit: "); Serial.println(data.diameterunit);
+  Serial.print("Pressure Unit: "); Serial.println(data.pressureunit);
+  Serial.print("Deform to Pressure: "); Serial.println(data.deformtopressure);
+  Serial.print("Next Part Name: "); Serial.println(data.nextpartname);
+  Serial.print("Batch Size: "); Serial.println(data.batchsize);
+  Serial.print("Batch Count: "); Serial.println(data.batchcount);
+  Serial.print("Diameter: "); Serial.println(data.diameter);
+  Serial.print("Pressure: "); Serial.println(data.pressure);
+  Serial.print("Now: "); Serial.println(data.now);
+}
+
+float modbusToFloat(uint16_t high, uint16_t low) {
+  uint32_t combined = ((uint32_t)high << 16) | low;
+  float result;
+  memcpy(&result, &combined, sizeof(result));
+  return result;
+}
+
+bool readStringFromModbus(uint8_t serverAddress, uint16_t startAddress, char* str, size_t length) {
+  bool success = true;
+  for (size_t i = 0; i < length / 2; i++) {
+    uint16_t combined = ModbusRTUServer.holdingRegisterRead(startAddress + i);
+    str[i * 2] = combined & 0xFF;
+    str[i * 2 + 1] = (combined >> 8) & 0xFF;
+  }
+  str[length] = '\0';
+  return success;
 }
