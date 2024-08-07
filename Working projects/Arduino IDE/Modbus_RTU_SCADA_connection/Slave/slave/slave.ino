@@ -1,14 +1,21 @@
+#include <WiFi.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 #include <ArduinoRS485.h> // ArduinoModbus depends on the ArduinoRS485 library
 #include <ArduinoModbus.h>
+#include "thingProperties.h"
 
 constexpr auto baudrate { 19200 };
 constexpr auto bitduration { 1.f / baudrate };
 constexpr auto preDelayBR { bitduration * 9.6f * 3.5f * 1e6 };
 constexpr auto postDelayBR { bitduration * 9.6f * 3.5f * 1e6 };
 
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600); // Adjust the time offset as needed
+
 struct DataStructure {
   int jobID;
-  char partname[20];
+  char partname[24];
   float deformdiameter;
   float correctionvalue;
   float deformpressure;
@@ -36,9 +43,9 @@ DataStructure data;
 
 bool loopData = false;
 unsigned long lastBlinkTime = 0;
-constexpr unsigned long blinkInterval = 500; // 500 ms interval for blinking
+unsigned long blinkInterval = 500; // 500 ms interval for blinking
 unsigned long lastButtonPress = 0;
-unsigned long readInterval = 1000; // Default read interval in milliseconds
+const unsigned long readInterval = 1000; // Default read interval in milliseconds
 unsigned long lastReadTime = 0;
 
 void setup() {
@@ -46,6 +53,18 @@ void setup() {
   while (!Serial);
 
   Serial.println("Modbus RTU Server");
+
+  // Connect to WiFi
+  WiFi.begin(SSID, PASS);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
+  }
+  Serial.println("Connected to WiFi");
+
+  // Initialize NTPClient
+  timeClient.begin();
+  timeClient.update();
 
   RS485.setDelays(preDelayBR, postDelayBR);
 
@@ -68,9 +87,9 @@ void setup() {
 }
 
 void loop() {
-  // Read potentiometer value and map to interval
+  // Read potentiometer value and map to blink interval
   int potValue = analogRead(A2);
-  readInterval = map(potValue, 0, 1023, 100, 2000);
+  blinkInterval = map(potValue, 0, 100, 200, 3000);
 
   // Handle START button
   if (digitalRead(A1) == HIGH && millis() - lastButtonPress > 300) { // Debounce delay
@@ -87,12 +106,12 @@ void loop() {
     lastButtonPress = millis();
   }
 
-  if (loopData) {
-    if (millis() - lastReadTime >= readInterval) {
-      receiveData();
-      lastReadTime = millis();
-    }
-  } else {
+  if (loopData && millis() - lastReadTime >= readInterval) {
+    receiveData();
+    lastReadTime = millis();
+  }
+
+  if (!loopData) {
     // Blink D1 when idle
     if (millis() - lastBlinkTime >= blinkInterval) {
       digitalWrite(D1, !digitalRead(D1)); // Toggle D1
@@ -129,6 +148,12 @@ void receiveData() {
   data.pressure = modbusToFloat(ModbusRTUServer.holdingRegisterRead(52), ModbusRTUServer.holdingRegisterRead(53));
   success &= readStringFromModbus(1, 54, data.now, 10);
 
+  // Get actual date and time from NTP
+  timeClient.update();
+  time_t rawTime = timeClient.getEpochTime();
+  struct tm * ptm = gmtime(&rawTime);
+  snprintf(data.now, sizeof(data.now), "%02d-%02d %02d:%02d:%02d", ptm->tm_mday, ptm->tm_mon + 1, ptm->tm_hour, ptm->tm_min, ptm->tm_sec);
+
   if (success) {
     digitalWrite(LED_RESET, HIGH); // Indicate successful Modbus connection
     digitalWrite(LEDR, LOW); // Turn off error indicator
@@ -137,7 +162,9 @@ void receiveData() {
     digitalWrite(LEDR, HIGH); // Indicate Modbus connection error
   }
 
-  printData();
+  if (loopData) {
+    printData();
+  }
 }
 
 void printData() {
@@ -175,7 +202,7 @@ float modbusToFloat(uint16_t high, uint16_t low) {
 
 bool readStringFromModbus(uint8_t serverAddress, uint16_t startAddress, char* str, size_t length) {
   bool success = true;
-  for (size_t i = 0; i < length / 2; i++) {
+  for (size_t i = 0; i < (length + 1) / 2; i++) {
     uint16_t combined = ModbusRTUServer.holdingRegisterRead(startAddress + i);
     str[i * 2] = combined & 0xFF;
     str[i * 2 + 1] = (combined >> 8) & 0xFF;

@@ -3,7 +3,7 @@
 
 struct DataStructure {
   int jobID;
-  char partname[20];
+  char partname[24];
   float deformdiameter;
   float correctionvalue;
   float deformpressure;
@@ -62,29 +62,7 @@ void setup() {
 
 void loop() {
   // Losowe generowanie danych co 1 sekundę
-  data.jobID = 25;
-  strcpy(data.partname, "28.91 VW 87665456");
-  data.deformdiameter = 17.7;
-  data.correctionvalue = 0.48;
-  data.deformpressure = 10.99;
-  data.dieset = 15.97;
-  data.maxdiameter = 28.03;
-  data.mindiameter = 18.29;
-  data.maxpressure = 19.94;
-  data.minpressure = 11.21;
-  data.opendiameter = 31.02;
-  data.pressureswitch = 29.58;
-  data.diameterswitch = 22.68;
-  data.holdingtime = 0.19;
-  data.diameterunit = true;
-  data.pressureunit = false;
-  data.deformtopressure = false;
-  strcpy(data.nextpartname, "clamp");
-  data.batchsize = 868;
-  data.batchcount = 57;
-  data.diameter = 24.33651;
-  data.pressure = 18.975712;
-  strcpy(data.now, "06/21/2024 10:15:58 AM");
+  generateRandomData();
 
   // Sygnalizacja wygenerowania danych
   digitalWrite(LED_D0, HIGH);
@@ -139,7 +117,7 @@ void loop() {
     Serial.println(ModbusRTUClient.lastError());
   }
 
-  delay(1000); // Czekanie 1 sekundy
+  delay(100); // Czekanie 1 sekundy
 }
 
 bool writeStringToModbus(uint8_t serverAddress, uint16_t startAddress, const char* str, size_t length) {
@@ -159,4 +137,30 @@ bool writeFloatToModbus(uint8_t serverAddress, uint16_t startAddress, float valu
   bool success = ModbusRTUClient.holdingRegisterWrite(serverAddress, startAddress, high);
   success &= ModbusRTUClient.holdingRegisterWrite(serverAddress, startAddress + 1, low);
   return success;
+}
+
+void generateRandomData() {
+  data.jobID = random(1, 100);
+  snprintf(data.partname, sizeof(data.partname), "Part%d", data.jobID);
+  data.deformdiameter = random(10, 200) / 10.0;
+  data.correctionvalue = random(0, 100) / 100.0;
+  data.deformpressure = random(0, 200) / 10.0;
+  data.dieset = random(0, 200) / 10.0;
+  data.maxdiameter = random(10, 300) / 10.0;
+  data.mindiameter = random(10, 300) / 10.0;
+  data.maxpressure = random(10, 200) / 10.0;
+  data.minpressure = random(10, 200) / 10.0;
+  data.opendiameter = random(10, 400) / 10.0;
+  data.pressureswitch = random(10, 400) / 10.0;
+  data.diameterswitch = random(10, 300) / 10.0;
+  data.holdingtime = random(0, 100) / 100.0;
+  data.diameterunit = random(0, 2);
+  data.pressureunit = random(0, 2);
+  data.deformtopressure = random(0, 2);
+  snprintf(data.nextpartname, sizeof(data.nextpartname), "Part%d", random(1, 100));
+  data.batchsize = random(1, 1000);
+  data.batchcount = random(1, 100);
+  data.diameter = random(10, 300) / 10.0;
+  data.pressure = random(10, 300) / 10.0;
+  snprintf(data.now, sizeof(data.now), "%02d/%02d/%04d %02d:%02d:%02d", random(1, 32), random(1, 13), random(2000, 2030), random(0, 24), random(0, 60), random(0, 60));
 }
