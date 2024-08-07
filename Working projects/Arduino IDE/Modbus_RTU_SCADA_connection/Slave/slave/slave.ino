@@ -10,6 +10,12 @@ constexpr auto bitduration { 1.f / baudrate };
 constexpr auto preDelayBR { bitduration * 9.6f * 3.5f * 1e6 };
 constexpr auto postDelayBR { bitduration * 9.6f * 3.5f * 1e6 };
 
+WiFiServer wifiServer(502);
+WiFiClient client;
+
+
+ModbusTCPServer modbusTCPServer;
+
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600); // Adjust the time offset as needed
 
@@ -48,6 +54,52 @@ unsigned long lastButtonPress = 0;
 const unsigned long readInterval = 1000; // Default read interval in milliseconds
 unsigned long lastReadTime = 0;
 
+void handleModbusTCP(const DataStructure& data) {
+  modbusTCPServer.holdingRegisterWrite(0, data.jobID);
+  writeStringToModbusTCP(1, data.partname);
+  writeFloatToModbusTCP(11, data.deformdiameter);
+  writeFloatToModbusTCP(13, data.correctionvalue);
+  writeFloatToModbusTCP(15, data.deformpressure);
+  writeFloatToModbusTCP(17, data.dieset);
+  writeFloatToModbusTCP(19, data.maxdiameter);
+  writeFloatToModbusTCP(21, data.mindiameter);
+  writeFloatToModbusTCP(23, data.maxpressure);
+  writeFloatToModbusTCP(25, data.minpressure);
+  writeFloatToModbusTCP(27, data.opendiameter);
+  writeFloatToModbusTCP(29, data.pressureswitch);
+  writeFloatToModbusTCP(31, data.diameterswitch);
+  writeFloatToModbusTCP(33, data.holdingtime);
+  modbusTCPServer.holdingRegisterWrite(35, data.diameterunit ? 1 : 0);
+  modbusTCPServer.holdingRegisterWrite(36, data.pressureunit ? 1 : 0);
+  modbusTCPServer.holdingRegisterWrite(37, data.deformtopressure ? 1 : 0);
+  writeStringToModbusTCP(38, data.nextpartname);
+  modbusTCPServer.holdingRegisterWrite(48, data.batchsize);
+  modbusTCPServer.holdingRegisterWrite(49, data.batchcount);
+  writeFloatToModbusTCP(50, data.diameter);
+  writeFloatToModbusTCP(52, data.pressure);
+  writeStringToModbusTCP(54, data.now);
+}
+
+bool writeStringToModbusTCP(uint16_t startAddress, const char* str) {
+  bool success = true;
+  for (size_t i = 0; i < strlen(str); i += 2) {
+    uint16_t combined = str[i] | (str[i + 1] << 8);
+    success &= modbusTCPServer.holdingRegisterWrite(startAddress + i / 2, combined);
+  }
+  return success;
+}
+
+bool writeFloatToModbusTCP(uint16_t startAddress, float value) {
+  uint32_t n;
+  memcpy(&n, &value, sizeof(n));
+  uint16_t high = (n >> 16) & 0xFFFF;
+  uint16_t low = n & 0xFFFF;
+  bool success = modbusTCPServer.holdingRegisterWrite(startAddress, high);
+  success &= modbusTCPServer.holdingRegisterWrite(startAddress + 1, low);
+  return success;
+}
+
+
 void setup() {
   Serial.begin(9600);
   while (!Serial);
@@ -61,6 +113,7 @@ void setup() {
     Serial.println("Connecting to WiFi...");
   }
   Serial.println("Connected to WiFi");
+
 
   // Initialize NTPClient
   timeClient.begin();
@@ -76,6 +129,24 @@ void setup() {
 
   // Configure holding registers at address 0x00
   ModbusRTUServer.configureHoldingRegisters(0x00, 60); // Ensure enough registers are allocated
+
+    // Initialize Modbus TCP Server
+  if (!modbusTCPServer.begin()) {  // 1502 is the default port for Modbus TCP
+    Serial.println("Failed to start Modbus TCP Server!");
+    while (1);
+  }
+  Serial.println("Modbus TCP Server started");
+
+  wifiServer.begin();
+
+  // Configure holding registers for Modbus TCP
+  modbusTCPServer.configureHoldingRegisters(0x00, 60);
+
+  // Display IP address and port information
+  Serial.print("Modbus TCP Server IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.print("Modbus TCP Server Port: ");
+  Serial.println(502);
 
   pinMode(A0, INPUT_PULLUP); // Button STOP (NC)
   pinMode(A1, INPUT); // Button START
@@ -109,6 +180,7 @@ void loop() {
   if (loopData && millis() - lastReadTime >= readInterval) {
     receiveData();
     lastReadTime = millis();
+    handleModbusTCP(data);
   }
 
   if (!loopData) {
@@ -120,7 +192,23 @@ void loop() {
   }
 
   ModbusRTUServer.poll();
+
+  // Check for new clients
+  if (!client || !client.connected()) {
+    client = wifiServer.available();
+    if (client) {
+      // a new client connected
+      Serial.println("New client connected");
+      modbusTCPServer.accept(client);
+    }
+  }
+
+  // Handle Modbus TCP requests if client is connected
+  if (client && client.connected()) {
+    modbusTCPServer.poll();
+  }
 }
+
 
 void receiveData() {
   bool success = true;
