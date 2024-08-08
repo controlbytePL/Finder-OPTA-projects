@@ -102,7 +102,6 @@ bool writeFloatToModbusTCP(uint16_t startAddress, float value) {
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial);
 
   Serial.println("Modbus RTU Server");
 
