@@ -36,7 +36,6 @@ constexpr auto postDelayBR { bitduration * 9.6f * 3.5f * 1e6 };
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial);
 
   Serial.println("Modbus RTU Client");
 
@@ -161,6 +160,6 @@ void generateRandomData() {
   data.batchsize = random(1, 1000);
   data.batchcount = random(1, 100);
   data.diameter = random(10, 300) / 10.0;
-  data.pressure = random(10, 300) / 10.0;
+  data.pressure = random(10, 50) / 10.0;
   snprintf(data.now, sizeof(data.now), "%02d/%02d/%04d %02d:%02d:%02d", random(1, 32), random(1, 13), random(2000, 2030), random(0, 24), random(0, 60), random(0, 60));
 }
