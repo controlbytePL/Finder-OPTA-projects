@@ -11,10 +11,21 @@ const uint8_t MODBUS_7M_ADDRESS = 33;
 float power;
 float voltage;
 float freq;
+float current;
 
 void setup()
 {
     Serial.begin(9600);
+
+    pinMode(D0, OUTPUT);
+    pinMode(D1, OUTPUT);
+    pinMode(D2, OUTPUT);
+    pinMode(D3, OUTPUT);
+
+    digitalWrite(D0, HIGH); // light
+    digitalWrite(D1, HIGH); // red lamp
+    digitalWrite(D2, HIGH); // ventilator
+    digitalWrite(D3, LOW);  // heater
 
     digitalWrite(LEDG, HIGH);
     digitalWrite(LEDB, HIGH);
@@ -104,6 +115,16 @@ void loop()
         power = convert_t6(data);
         iPower = (float)power;
     }
+
+    data = modbus_7m_read32(MODBUS_7M_ADDRESS, FINDER_7M_REG_I1);
+    Serial.println("   current I1 = " + (data != INVALID_DATA ? String(convert_t5(data)) : String("read error")));
+
+    if (data != INVALID_DATA)
+    {
+        current = convert_t5(data);
+        iCurrent = (float)current;
+    }
+
     for (uint32_t i = 0; i < READ_INTERVAL_SECONDS * 10; i++)
     {
         ArduinoCloud.update();
@@ -195,6 +216,30 @@ uint32_t modbus_7m_read32(uint8_t addr, uint16_t reg)
     return INVALID_DATA;
 }
 
+void onHeaterChange() {
+    if (xHeater_button) {
+        digitalWrite(D3, HIGH);
+    } else {
+        digitalWrite(D3, LOW);
+    }
+}
+
+void onVentilatorChange() {
+    if (xVentilator_button) {
+        digitalWrite(D2, HIGH);
+    } else {
+        digitalWrite(D2, LOW);
+    }
+}
+
+void onLampChange() {
+    if (xLamp_button) {
+        digitalWrite(D0, HIGH);
+    } else {
+        digitalWrite(D0, LOW);
+    }
+}
+
 void iotConnect()
 {
     digitalWrite(LEDB, HIGH);
@@ -204,4 +249,3 @@ void iotDisconnect()
 {
     digitalWrite(LEDB, LOW);
 }
-
