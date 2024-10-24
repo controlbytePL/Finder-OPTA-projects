@@ -6,8 +6,8 @@
 
 #define PERIODIC_UPDATE_TIME 2000
 
-const char ssid[]     = "Internet ADAM";    // Network SSID (name)
-const char pass[]     = "MartynaSzymon2003!";    // Network password (use for WPA, or use as key for WEP)
+const char ssid[]     = "";    // Network SSID (name)
+const char pass[]     = "";    // Network password (use for WPA, or use as key for WEP)
 int status  = WL_IDLE_STATUS;
 
 // Ustawienia NTP
